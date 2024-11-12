@@ -1,0 +1,6 @@
+@Hd2.API_HostAddress = http://localhost:5260
+
+GET {{Hd2.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
