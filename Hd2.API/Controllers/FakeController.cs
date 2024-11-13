@@ -1,10 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Hd2.API.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Hd2.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class FakeController : ControllerBase
-{
+public class FakeController(Generator generator) : ControllerBase {
+    [HttpPost("t1")]
+    public async Task<IActionResult> T1([FromQuery] int days)
+    {
+        await generator.GenerateT1(days);
+        return Ok();
+    }
 }

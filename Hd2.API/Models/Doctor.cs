@@ -7,7 +7,7 @@ namespace Hd2.API.Models;
 public class Doctor : Person
 {
     [StringLength(50)] [Required] public string Pwz { get; set; }
-    [StringLength(50)][Required] public string Specialization { get; set; }
+    [StringLength(50)] [Required] public string Specialization { get; set; }
 
     // Navigation property to many or zero procedures
     public ICollection<Procedure> Procedures { get; set; } = new List<Procedure>();

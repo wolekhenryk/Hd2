@@ -5,6 +5,17 @@ namespace Hd2.API.Data;
 
 public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(options)
 {
+    public DbSet<Person> People { get; init; }
+    public DbSet<Patient> Patients { get; init; }
+    public DbSet<Doctor> Doctors { get; init; }
+    public DbSet<Donor> Donors { get; init; }
+    public DbSet<Procedure> Procedures { get; init; }
+    public DbSet<Complication> Complications { get; init; }
+    public DbSet<Hospital> Hospitals { get; init; }
+    public DbSet<Organ> Organs { get; init; }
+    public DbSet<OrganType> OrganTypes { get; init; }
+    public DbSet<Address> Addresses { get; init; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // IS A
@@ -35,10 +46,10 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
             .ValueGeneratedOnAdd();
 
         // 2. Auto-incremented primary key for Address
-        modelBuilder
-            .Entity<Address>()
-            .Property(a => a.Id)
-            .ValueGeneratedOnAdd();
+        //modelBuilder
+        //    .Entity<Address>()
+        //    .Property(a => a.Id)
+        //    .ValueGeneratedOnAdd();
 
         // 3. Auto-incremented primary key for Complication
         modelBuilder
@@ -47,10 +58,10 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
             .ValueGeneratedOnAdd();
 
         // 4. Auto-incremented primary key for Hospital
-        modelBuilder
-            .Entity<Hospital>()
-            .Property(h => h.Id)
-            .ValueGeneratedOnAdd();
+        //modelBuilder
+        //    .Entity<Hospital>()
+        //    .Property(h => h.Id)
+        //    .ValueGeneratedOnAdd();
 
         // 5. Auto-incremented primary key for Organ
         modelBuilder

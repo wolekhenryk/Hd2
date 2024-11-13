@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Hd2.API.Migrations
 {
     /// <inheritdoc />
-    public partial class initial : Migration
+    public partial class key : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

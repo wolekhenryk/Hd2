@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Hd2.API.Migrations
 {
     [DbContext(typeof(HdDbContext))]
-    [Migration("20241112135159_initial")]
-    partial class initial
+    [Migration("20241113175450_key")]
+    partial class key
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
