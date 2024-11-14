@@ -1,6 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 using Bogus;
+using CsvHelper;
 using EFCore.BulkExtensions;
 using Hd2.API.Data;
 using Hd2.API.Models;
@@ -10,6 +13,17 @@ using Person = Hd2.API.Models.Person;
 namespace Hd2.API.Services;
 
 public record OrganDonor(Organ Organ, Donor Donor);
+
+public record ExcelRow(
+    int ProcedureId,
+    string MedicationName,
+    string Manufacturer,
+    string ChemicalName,
+    decimal Dose,
+    DateTime AdministrationDateTime,
+    string Observations);
+
+public record Medication(string Name, string Chemical, string Manufacturer, decimal Dose);
 
 public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 {
@@ -94,7 +108,26 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
         "zawał"
     ];
 
-    public async Task GenerateT1(int days)
+    private readonly Medication[] _medications = [
+        new Medication("Paracetamol", "Paracetamol", "Polpharma", 500),
+        new Medication("Ibuprofen", "Ibuprofen", "Polpharma", 200),
+        new Medication("Amoxicillin", "Amoxicillin", "Polpharma", 500),
+        new Medication("Diazepam", "Diazepam", "Polpharma", 5),
+        new Medication("Omeprazole", "Omeprazole", "Polpharma", 20),
+        new Medication("Cetirizine", "Cetirizine", "Polpharma", 10),
+        new Medication("Loratadine", "Loratadine", "Polpharma", 10),
+        new Medication("Ciprofloxacin", "Ciprofloxacin", "Polpharma", 500),
+        new Medication("Metronidazole", "Metronidazole", "Polpharma", 500),
+        new Medication("Clarithromycin", "Clarithromycin", "Polpharma", 500),
+        new Medication("Azithromycin", "Azithromycin", "Polpharma", 500),
+        new Medication("Cefuroxime", "Cefuroxime", "Polpharma", 500),
+        new Medication("Ceftriaxone", "Ceftriaxone", "Polpharma", 500),
+        new Medication("Cefotaxime", "Cefotaxime", "Polpharma", 500),
+        new Medication("Cefixime", "Cefixime", "Polpharma", 500),
+        new Medication("Cefepime", "Cefepime", "Polpharma", 500)
+    ];
+
+    public async Task<MemoryStream> GenerateT1(int days)
     {
         await GenerateHospitalsAndDoctors();
 
@@ -103,15 +136,94 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
         await GenerateProcedures(days, false);
 
         await GenerateComplications();
+
+        return await GenerateCsvT1();
     }
 
-    public async Task GenerateT2(int days)
+    public async Task<MemoryStream> GenerateT2(int days, MemoryStream t1Csv)
     {
         await GenerateProcedures(days, true);
 
         await GenerateComplications();
 
         await ChangeAddressOfAPatient();
+
+        return await GenerateCsvT2(t1Csv);
+    }
+
+    private async Task<MemoryStream> GenerateCsvT2(Stream t1Csv)
+    {
+        var proceduresAfterToday = await dbContext
+            .Procedures
+            .Where(p => p.StartDateTime.Date >= DateTime.Now.Date)
+            .ToListAsync();
+
+        // Load the T1 CSV file
+        using var reader = new StreamReader(t1Csv, Encoding.UTF8);
+        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
+        var rows = csv.GetRecords<ExcelRow>().ToList();
+
+        foreach (var procedure in proceduresAfterToday)
+        {
+            var procedureDurationInMinutes = (int)procedure.EndDateTime.Subtract(procedure.StartDateTime).TotalMinutes;
+            rows.AddRange(_faker
+                .PickRandom(_medications, Random.Shared.Next(1, 5))
+                .Select(m => new ExcelRow(procedure.Id,
+                    m.Name,
+                    m.Manufacturer,
+                    m.Chemical,
+                    m.Dose,
+                    procedure.StartDateTime.AddMinutes(Random.Shared.Next(procedureDurationInMinutes - 10)),
+                    _faker.Lorem.Sentence())));
+        }
+
+        var ms = new MemoryStream();
+
+        await using var writer = new StreamWriter(ms, Encoding.UTF8);
+        await using var csvWriter = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        await csvWriter.WriteRecordsAsync(rows);
+        await writer.FlushAsync();
+
+        ms.Seek(0, SeekOrigin.Begin);
+
+        return ms;
+    }
+
+    private async Task<MemoryStream> GenerateCsvT1()
+    {
+        var allProcedures = await dbContext
+            .Procedures
+            .ToListAsync();
+
+        List<ExcelRow> rows = [];
+
+        foreach (var procedure in allProcedures)
+        {
+            var procedureDurationInMinutes = (int)procedure.EndDateTime.Subtract(procedure.StartDateTime).TotalMinutes;
+            rows.AddRange(_faker
+                .PickRandom(_medications, Random.Shared.Next(1, 5))
+                .Select(m => new ExcelRow(procedure.Id,
+                    m.Name,
+                    m.Manufacturer,
+                    m.Chemical,
+                    m.Dose,
+                    procedure.StartDateTime.AddMinutes(Random.Shared.Next(procedureDurationInMinutes - 10)),
+                    _faker.Lorem.Sentence())));
+        }
+
+        var ms = new MemoryStream();
+
+        await using var writer = new StreamWriter(ms, Encoding.UTF8);
+        await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        await csv.WriteRecordsAsync(rows);
+        await writer.FlushAsync();
+
+        ms.Seek(0, SeekOrigin.Begin);
+
+        return ms;
     }
 
     private async Task ChangeAddressOfAPatient()
@@ -244,7 +356,7 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
         var complications = procedures
             .SelectMany(procedure =>
             {
-                var complicationCount = Random.Shared.Next(0, 3);
+                var complicationCount = Random.Shared.Next(0, 4);
 
                 return Enumerable.Range(0, complicationCount)
                     .Select(_ => new Complication
