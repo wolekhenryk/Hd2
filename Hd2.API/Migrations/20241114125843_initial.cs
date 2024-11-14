@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Hd2.API.Migrations
 {
     /// <inheritdoc />
-    public partial class key : Migration
+    public partial class initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -202,30 +202,6 @@ namespace Hd2.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "DoctorProcedure",
-                columns: table => new
-                {
-                    DoctorsPesel = table.Column<string>(type: "nvarchar(11)", nullable: false),
-                    ProceduresId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DoctorProcedure", x => new { x.DoctorsPesel, x.ProceduresId });
-                    table.ForeignKey(
-                        name: "FK_DoctorProcedure_Lekarze_DoctorsPesel",
-                        column: x => x.DoctorsPesel,
-                        principalTable: "Lekarze",
-                        principalColumn: "Pesel",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_DoctorProcedure_Zabiegi_ProceduresId",
-                        column: x => x.ProceduresId,
-                        principalTable: "Zabiegi",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Komplikacje",
                 columns: table => new
                 {
@@ -245,10 +221,29 @@ namespace Hd2.API.Migrations
                         principalColumn: "Id");
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_DoctorProcedure_ProceduresId",
-                table: "DoctorProcedure",
-                column: "ProceduresId");
+            migrationBuilder.CreateTable(
+                name: "LekarzZabieg",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DoctorPesel = table.Column<string>(type: "nvarchar(11)", nullable: false),
+                    ProcedureId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LekarzZabieg", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_LekarzZabieg_Lekarze_DoctorPesel",
+                        column: x => x.DoctorPesel,
+                        principalTable: "Lekarze",
+                        principalColumn: "Pesel");
+                    table.ForeignKey(
+                        name: "FK_LekarzZabieg_Zabiegi_ProcedureId",
+                        column: x => x.ProcedureId,
+                        principalTable: "Zabiegi",
+                        principalColumn: "Id");
+                });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Komplikacje_ProcedureId",
@@ -266,6 +261,16 @@ namespace Hd2.API.Migrations
                 column: "Pwz",
                 unique: true,
                 filter: "[Pwz] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LekarzZabieg_DoctorPesel",
+                table: "LekarzZabieg",
+                column: "DoctorPesel");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LekarzZabieg_ProcedureId",
+                table: "LekarzZabieg",
+                column: "ProcedureId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Narzady_DonorPesel",
@@ -309,10 +314,10 @@ namespace Hd2.API.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "DoctorProcedure");
+                name: "Komplikacje");
 
             migrationBuilder.DropTable(
-                name: "Komplikacje");
+                name: "LekarzZabieg");
 
             migrationBuilder.DropTable(
                 name: "Lekarze");

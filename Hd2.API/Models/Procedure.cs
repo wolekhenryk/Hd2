@@ -15,7 +15,7 @@ public class Procedure
     public string PatientPesel { get; set; }
 
     // Navigation property to many doctors
-    public ICollection<Doctor> Doctors { get; set; } = new List<Doctor>();
+    public ICollection<DoctorProcedure> DoctorProcedures { get; set; } = new List<DoctorProcedure>();
 
     // Navigation property to many or zero complications
     public ICollection<Complication> Complications { get; set; } = new List<Complication>();

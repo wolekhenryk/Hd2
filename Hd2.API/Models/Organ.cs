@@ -21,4 +21,7 @@ public class Organ
 
     // Navigation property to one procedure
     public Procedure Procedure { get; set; }
+
+    [NotMapped]
+    public DateTime ScheduledProcedureDate { get; set; }
 }

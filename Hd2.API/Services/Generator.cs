@@ -9,9 +9,11 @@ using Person = Hd2.API.Models.Person;
 
 namespace Hd2.API.Services;
 
+public record OrganDonor(Organ Organ, Donor Donor);
+
 public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 {
-    private const int NumberOfHospitals = 1;
+    private const int NumberOfHospitals = 2;
 
     private readonly Faker _faker = new();
 
@@ -98,51 +100,136 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
         await GenerateOrganTypes();
 
-        await GenerateProcedures(days);
+        await GenerateProcedures(days, false);
 
         await GenerateComplications();
     }
 
-    private async Task GenerateProcedures(int daysToGoBack)
+    public async Task GenerateT2(int days)
     {
-        List<Procedure> procedures = [];
+        await GenerateProcedures(days, true);
 
+        await GenerateComplications();
+
+        await ChangeAddressOfAPatient();
+    }
+
+    private async Task ChangeAddressOfAPatient()
+    {
+        // Randomly select a patient
+        var patient = await dbContext.Patients
+            .Include(p => p.Address)
+            .OrderBy(_ => Guid.NewGuid())
+            .FirstOrDefaultAsync();
+
+        if (patient is null)
+            throw new NullReferenceException("No patient found.");
+
+        var newAddress = GenerateFakeAddress();
+
+        // Add the new address to the database
+        await dbContext.Addresses.AddAsync(newAddress);
+        await dbContext.SaveChangesAsync();
+
+        // Hold the old address reference
+        var oldAddress = patient.Address;
+
+        // Update patient's address to the new one
+        patient.Address = newAddress;
+        dbContext.Patients.Update(patient);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task GenerateProcedures(int daysToGoBack, bool t2)
+    {
         var hospitals = await dbContext
             .Hospitals
             .Include(h => h.Doctors)
             .ToListAsync();
 
-        for (var i = 0; i < daysToGoBack; i++)
+        foreach (var hospital in hospitals)
         {
-            var today = DateTime.Now.AddDays(-i);
-            foreach (var hospital in hospitals)
+            var sw = Stopwatch.StartNew();
+
+            var proceduresDaily = hospital.Doctors.Count / 2;
+            var procedureCount = daysToGoBack * proceduresDaily;
+
+            var patients = await GeneratePatients(procedureCount);
+
+            await dbContext.BulkInsertAsync(patients);
+
+            var procedureDates = Enumerable
+                .Range(1, daysToGoBack)
+                .Select(i => DateTime.Now.AddDays(t2 ? i : -i))
+                .ToList();
+
+            var donorsOrgansList = await GenerateDonorsAndOrgans(procedureCount, proceduresDaily, procedureDates);
+
+            var patientBatches = patients
+                .Chunk(proceduresDaily)
+                .ToList();
+
+            var donorsOrgansBatches = donorsOrgansList
+                .OrderBy(o => o.Organ.ScheduledProcedureDate)
+                .Chunk(proceduresDaily)
+                .ToList();
+
+            var doctorTeams = hospital.Doctors
+                .Chunk(2)
+                .ToList();
+
+            var procedures = patientBatches
+                .Zip(donorsOrgansBatches, (patientBatch, donorOrganBatch) => (patientBatch, donorOrganBatch))
+                .Zip(procedureDates, (patientOrganDonor, procedureDate) => (
+                    patientOrganDonor.patientBatch,
+                    patientOrganDonor.donorOrganBatch,
+                    procedureDate))
+                .SelectMany(element =>
+                {
+                    var (patientBatch, donorsOrgans, date) = element;
+
+                    return patientBatch
+                        .Zip(doctorTeams, (patient, doctors) => (patient, doctors))
+                        .Zip(donorsOrgans,
+                            (patientDoctor, donorOrgan) => (patientDoctor.patient, patientDoctor.doctors, donorOrgan))
+                        .Select(patientDoctorDonorOrgan =>
+                        {
+                            var (patient, doctors, donorOrgan) = patientDoctorDonorOrgan;
+
+                            return GenerateProcedure(hospital.Id, date, patient.Pesel, donorOrgan.Organ.Id);
+                        });
+                })
+                .ToList();
+
+            await dbContext.Procedures.AddRangeAsync(procedures);
+            await dbContext.SaveChangesAsync();
+
+            List<DoctorProcedure> doctorProcedures = [];
+
+            foreach (var dailyProcedures in procedures.GroupBy(p => p.StartDateTime.Date))
             {
-                var doctors = hospital.Doctors.ToList();
-                var doctorBatches = doctors.Chunk(2).ToList();
-
-                var procedureCount = doctorBatches.Count;
-
-                var donorsOrgansList = await GenerateDonorsAndOrgans(procedureCount, today);
-
-                var patients = await GeneratePatients(procedureCount);
-
-                var tempProcedures = doctorBatches
-                    .Zip(donorsOrgansList, (doctor, donorOrgan) => (doctor, donorOrgan))
-                    .Zip(patients, (doctorDonorOrgan, patient) => (doctorDonorOrgan, patient))
-                    .Select(tempDataHolder => new
+                doctorProcedures.AddRange(dailyProcedures
+                    .Zip(doctorTeams, (procedure, doctors) => (procedure, doctors))
+                    .SelectMany(element =>
                     {
-                        tempDataHolder.doctorDonorOrgan.doctor,
-                        tempDataHolder.doctorDonorOrgan.donorOrgan.Item1,
-                        tempDataHolder.doctorDonorOrgan.donorOrgan.Item2,
-                        tempDataHolder.patient
-                    })
-                    .Select(a => GenerateProcedure(hospital.Id, today, a.patient.Pesel, a.doctor.ToList(), a.Item2.Id));
+                        var (procedure, doctors) = element;
 
-                procedures.AddRange(tempProcedures);
+                        // Return 2 doctor procedures for each procedure
+                        return doctors
+                            .Select(doctor => new DoctorProcedure
+                            {
+                                DoctorPesel = doctor.Pesel,
+                                ProcedureId = procedure.Id
+                            });
+                    }));
             }
-        }
 
-        await dbContext.BulkInsertAsync(procedures);
+            await dbContext.BulkInsertAsync(doctorProcedures);
+
+            sw.Stop();
+
+            logger.LogInformation($"Generated {procedures.Count} procedures in {sw.ElapsedMilliseconds} ms");
+        }
     }
 
     private async Task GenerateComplications()
@@ -186,7 +273,8 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
             .ToList();
     }
 
-    private async Task<List<(Donor, Organ)>> GenerateDonorsAndOrgans(int count, DateTime today)
+    private async Task<List<OrganDonor>> GenerateDonorsAndOrgans(int count, int dailyProcedures,
+        IEnumerable<DateTime> procedureDates)
     {
         var fakePeople = await GenerateFakePeople(count);
 
@@ -196,7 +284,7 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
                 Pesel = person.Pesel,
                 BloodType = _faker.PickRandom(_grupyKrwi),
                 AliveDuringExtraction = Random.Shared.NextDouble() < 0.99,
-                HealthStatus = _faker.Lorem.Sentence() 
+                HealthStatus = _faker.Lorem.Sentence()
             })
             .ToList();
 
@@ -206,30 +294,35 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
         var organTypes = await dbContext.OrganTypes.ToListAsync();
 
-        var currentOrganCount = await dbContext.Organs.CountAsync();
+        List<Organ> organs = [];
 
-        // generate organs
-        var organs = donors.Select(donor => new Organ
+        var batched = donors
+            .Chunk(dailyProcedures)
+            .Zip(procedureDates, (donorsBatch, dates) => (donorsBatch, dates));
+
+        foreach (var (donorsBatch, date) in batched)
         {
-            HarvestDateTime = today.AddDays(-Random.Shared.Next(1, 14)),
-            StorageType = _faker.PickRandom(_typyPrzechowywaniaNarzadow),
-            OrganTypeId = _faker.PickRandom(organTypes).Id,
-            DonorPesel = donor.Pesel
-        }).ToList();
+            organs.AddRange(donorsBatch.Select(donor => new Organ
+            {
+                HarvestDateTime = date.AddDays(-Random.Shared.Next(1, 14)),
+                ScheduledProcedureDate = date,
+                StorageType = _faker.PickRandom(_typyPrzechowywaniaNarzadow),
+                OrganTypeId = _faker.PickRandom(organTypes).Id,
+                DonorPesel = donor.Pesel
+            }));
+        }
 
-        await dbContext.BulkInsertAsync(organs);
-
-        organs = await dbContext.Organs.Skip(currentOrganCount).ToListAsync();
+        await dbContext.Organs.AddRangeAsync(organs);
+        await dbContext.SaveChangesAsync();
 
         return donors
-            .Zip(organs, (donor, organ) => (donor, organ))
+            .Zip(organs, (donor, organ) => new OrganDonor(organ, donor))
             .ToList();
     }
 
     private Procedure GenerateProcedure(int hospitalId,
         DateTime today,
         string patientsPesel,
-        ICollection<Doctor> doctors,
         int organId)
     {
         var minutes = Random.Shared.Next(0, 60);
@@ -244,7 +337,6 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
             StartDateTime = startDateTime,
             EndDateTime = startDateTime.AddMinutes(randomDurationInMinutes),
             PatientPesel = patientsPesel,
-            Doctors = doctors,
             HospitalId = hospitalId,
             OrganId = organId
         };
@@ -354,8 +446,9 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
         await dbContext.BulkInsertAsync(randomAddresses);
 
-        // reload addresses to get their ids
-        randomAddresses = await dbContext.Addresses.ToListAsync();
+        var lastAddressId = dbContext.Addresses.Max(a => a.Id);
+
+        var i = 0;
 
         var fakePeopleGenerator = new Faker<Person>()
             .CustomInstantiator(f =>
@@ -363,11 +456,12 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
                 var pesel = peselCounter.ToString("D11");
 
                 peselCounter++;
+                i++;
 
                 return new Person
                 {
-                    AddressId = randomAddresses[randomAddresses.Count - 1 - peselCounter].Id,
-                    BirthDate = DateOnly.FromDateTime(f.Date.Past(18, DateTime.Now)),
+                    AddressId = lastAddressId - i,
+                    BirthDate = DateOnly.FromDateTime(f.Date.Past(50, DateTime.Now.AddYears(-18))),
                     FirstName = f.Name.FirstName(),
                     LastName = f.Name.LastName(),
                     Pesel = pesel

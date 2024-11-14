@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Hd2.API.Migrations
 {
     [DbContext(typeof(HdDbContext))]
-    [Migration("20241113175450_key")]
-    partial class key
+    [Migration("20241114125843_initial")]
+    partial class initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,21 +24,6 @@ namespace Hd2.API.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("DoctorProcedure", b =>
-                {
-                    b.Property<string>("DoctorsPesel")
-                        .HasColumnType("nvarchar(11)");
-
-                    b.Property<int>("ProceduresId")
-                        .HasColumnType("int");
-
-                    b.HasKey("DoctorsPesel", "ProceduresId");
-
-                    b.HasIndex("ProceduresId");
-
-                    b.ToTable("DoctorProcedure", (string)null);
-                });
 
             modelBuilder.Entity("Hd2.API.Models.Address", b =>
                 {
@@ -97,6 +82,30 @@ namespace Hd2.API.Migrations
                     b.HasIndex("ProcedureId");
 
                     b.ToTable("Komplikacje");
+                });
+
+            modelBuilder.Entity("Hd2.API.Models.DoctorProcedure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DoctorPesel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(11)");
+
+                    b.Property<int>("ProcedureId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DoctorPesel");
+
+                    b.HasIndex("ProcedureId");
+
+                    b.ToTable("LekarzZabieg");
                 });
 
             modelBuilder.Entity("Hd2.API.Models.Hospital", b =>
@@ -303,21 +312,6 @@ namespace Hd2.API.Migrations
                     b.ToTable("Pacjenci");
                 });
 
-            modelBuilder.Entity("DoctorProcedure", b =>
-                {
-                    b.HasOne("Hd2.API.Models.Doctor", null)
-                        .WithMany()
-                        .HasForeignKey("DoctorsPesel")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Hd2.API.Models.Procedure", null)
-                        .WithMany()
-                        .HasForeignKey("ProceduresId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Hd2.API.Models.Complication", b =>
                 {
                     b.HasOne("Hd2.API.Models.Procedure", "Procedure")
@@ -325,6 +319,25 @@ namespace Hd2.API.Migrations
                         .HasForeignKey("ProcedureId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.Navigation("Procedure");
+                });
+
+            modelBuilder.Entity("Hd2.API.Models.DoctorProcedure", b =>
+                {
+                    b.HasOne("Hd2.API.Models.Doctor", "Doctor")
+                        .WithMany("DoctorProcedures")
+                        .HasForeignKey("DoctorPesel")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Hd2.API.Models.Procedure", "Procedure")
+                        .WithMany("DoctorProcedures")
+                        .HasForeignKey("ProcedureId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Doctor");
 
                     b.Navigation("Procedure");
                 });
@@ -461,6 +474,13 @@ namespace Hd2.API.Migrations
             modelBuilder.Entity("Hd2.API.Models.Procedure", b =>
                 {
                     b.Navigation("Complications");
+
+                    b.Navigation("DoctorProcedures");
+                });
+
+            modelBuilder.Entity("Hd2.API.Models.Doctor", b =>
+                {
+                    b.Navigation("DoctorProcedures");
                 });
 
             modelBuilder.Entity("Hd2.API.Models.Donor", b =>

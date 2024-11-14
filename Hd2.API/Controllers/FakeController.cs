@@ -13,4 +13,11 @@ public class FakeController(Generator generator) : ControllerBase {
         await generator.GenerateT1(days);
         return Ok();
     }
+
+    [HttpPost("t2")]
+    public async Task<IActionResult> T2([FromQuery] int days)
+    {
+        await generator.GenerateT2(days);
+        return Ok();
+    }
 }

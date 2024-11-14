@@ -15,6 +15,7 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
     public DbSet<Organ> Organs { get; init; }
     public DbSet<OrganType> OrganTypes { get; init; }
     public DbSet<Address> Addresses { get; init; }
+    public DbSet<DoctorProcedure> DoctorProcedures { get; init; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,10 +47,10 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
             .ValueGeneratedOnAdd();
 
         // 2. Auto-incremented primary key for Address
-        //modelBuilder
-        //    .Entity<Address>()
-        //    .Property(a => a.Id)
-        //    .ValueGeneratedOnAdd();
+        modelBuilder
+            .Entity<Address>()
+            .Property(a => a.Id)
+            .ValueGeneratedOnAdd();
 
         // 3. Auto-incremented primary key for Complication
         modelBuilder
@@ -58,10 +59,10 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
             .ValueGeneratedOnAdd();
 
         // 4. Auto-incremented primary key for Hospital
-        //modelBuilder
-        //    .Entity<Hospital>()
-        //    .Property(h => h.Id)
-        //    .ValueGeneratedOnAdd();
+        modelBuilder
+            .Entity<Hospital>()
+            .Property(h => h.Id)
+            .ValueGeneratedOnAdd();
 
         // 5. Auto-incremented primary key for Organ
         modelBuilder
@@ -73,6 +74,12 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
         modelBuilder
             .Entity<OrganType>()
             .Property(ot => ot.Id)
+            .ValueGeneratedOnAdd();
+
+        // 7. Auto-incremented primary key for DoctorProcedure
+        modelBuilder
+            .Entity<DoctorProcedure>()
+            .Property(dp => dp.Id)
             .ValueGeneratedOnAdd();
 
         // One-to-one relationship between Hospital and Address
@@ -149,10 +156,17 @@ public class HdDbContext(DbContextOptions<HdDbContext> options) : DbContext(opti
 
         // Many doctors to many procedures
         modelBuilder
-            .Entity<Doctor>()
-            .HasMany(d => d.Procedures)
-            .WithMany(p => p.Doctors)
-            .UsingEntity(j => j.ToTable("DoctorProcedure"));
+            .Entity<DoctorProcedure>()
+            .HasOne(dp => dp.Doctor)
+            .WithMany(d => d.DoctorProcedures)
+            .HasForeignKey(dp => dp.DoctorPesel)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<DoctorProcedure>()
+            .HasOne(dp => dp.Procedure)
+            .WithMany(p => p.DoctorProcedures)
+            .HasForeignKey(dp => dp.ProcedureId)
+            .OnDelete(DeleteBehavior.NoAction);
 
 
         base.OnModelCreating(modelBuilder);
