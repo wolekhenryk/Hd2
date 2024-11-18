@@ -104,15 +104,6 @@ CREATE TABLE [Zabiegi] (
 );
 GO
 
-CREATE TABLE [DoctorProcedure] (
-    [DoctorsPesel] nvarchar(11) NOT NULL,
-    [ProceduresId] int NOT NULL,
-    CONSTRAINT [PK_DoctorProcedure] PRIMARY KEY ([DoctorsPesel], [ProceduresId]),
-    CONSTRAINT [FK_DoctorProcedure_Lekarze_DoctorsPesel] FOREIGN KEY ([DoctorsPesel]) REFERENCES [Lekarze] ([Pesel]) ON DELETE CASCADE,
-    CONSTRAINT [FK_DoctorProcedure_Zabiegi_ProceduresId] FOREIGN KEY ([ProceduresId]) REFERENCES [Zabiegi] ([Id]) ON DELETE CASCADE
-);
-GO
-
 CREATE TABLE [Komplikacje] (
     [Id] int NOT NULL IDENTITY,
     [Description] nvarchar(1000) NOT NULL,
@@ -123,7 +114,14 @@ CREATE TABLE [Komplikacje] (
 );
 GO
 
-CREATE INDEX [IX_DoctorProcedure_ProceduresId] ON [DoctorProcedure] ([ProceduresId]);
+CREATE TABLE [LekarzZabieg] (
+    [Id] int NOT NULL IDENTITY,
+    [DoctorPesel] nvarchar(11) NOT NULL,
+    [ProcedureId] int NOT NULL,
+    CONSTRAINT [PK_LekarzZabieg] PRIMARY KEY ([Id]),
+    CONSTRAINT [FK_LekarzZabieg_Lekarze_DoctorPesel] FOREIGN KEY ([DoctorPesel]) REFERENCES [Lekarze] ([Pesel]),
+    CONSTRAINT [FK_LekarzZabieg_Zabiegi_ProcedureId] FOREIGN KEY ([ProcedureId]) REFERENCES [Zabiegi] ([Id])
+);
 GO
 
 CREATE INDEX [IX_Komplikacje_ProcedureId] ON [Komplikacje] ([ProcedureId]);
@@ -133,6 +131,12 @@ CREATE INDEX [IX_Lekarze_HospitalId] ON [Lekarze] ([HospitalId]);
 GO
 
 CREATE UNIQUE INDEX [IX_Lekarze_Pwz] ON [Lekarze] ([Pwz]) WHERE [Pwz] IS NOT NULL;
+GO
+
+CREATE INDEX [IX_LekarzZabieg_DoctorPesel] ON [LekarzZabieg] ([DoctorPesel]);
+GO
+
+CREATE INDEX [IX_LekarzZabieg_ProcedureId] ON [LekarzZabieg] ([ProcedureId]);
 GO
 
 CREATE INDEX [IX_Narzady_DonorPesel] ON [Narzady] ([DonorPesel]);
@@ -157,7 +161,7 @@ CREATE INDEX [IX_Zabiegi_PatientPesel] ON [Zabiegi] ([PatientPesel]);
 GO
 
 INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20241112135159_initial', N'8.0.10');
+VALUES (N'20241114125843_initial', N'8.0.10');
 GO
 
 COMMIT;

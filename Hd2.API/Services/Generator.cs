@@ -27,7 +27,7 @@ public record Medication(string Name, string Chemical, string Manufacturer, deci
 
 public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 {
-    private const int NumberOfHospitals = 2;
+    private const int NumberOfHospitals = 1;
 
     private readonly Faker _faker = new();
 
@@ -142,11 +142,11 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
     public async Task<MemoryStream> GenerateT2(int days, MemoryStream t1Csv)
     {
+        await ChangeAddressOfAPatient();
+
         await GenerateProcedures(days, true);
 
         await GenerateComplications();
-
-        await ChangeAddressOfAPatient();
 
         return await GenerateCsvT2(t1Csv);
     }
@@ -237,14 +237,13 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
         if (patient is null)
             throw new NullReferenceException("No patient found.");
 
+        logger.LogInformation($"Changing address of patient with PESEL: {patient.Pesel}");
+
         var newAddress = GenerateFakeAddress();
 
         // Add the new address to the database
         await dbContext.Addresses.AddAsync(newAddress);
         await dbContext.SaveChangesAsync();
-
-        // Hold the old address reference
-        var oldAddress = patient.Address;
 
         // Update patient's address to the new one
         patient.Address = newAddress;
