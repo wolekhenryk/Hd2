@@ -27,7 +27,7 @@ public record Medication(string Name, string Chemical, string Manufacturer, deci
 
 public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 {
-    private const int NumberOfHospitals = 1;
+    private const int NumberOfHospitals = 2;
 
     private readonly Faker _faker = new();
 
@@ -54,24 +54,15 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
     private readonly string[] _typyNarzadow =
     [
         "Wątroba",
-        "Płuca",
+        "Płuco",
         "Serce",
         "Nerka",
         "Trzustka",
         "Jelito",
         "Żołądek",
         "Mózg",
-        "Ręka",
-        "Noga",
-        "Oko",
-        "Ucho",
-        "Nos",
-        "Gardło",
-        "Wargi",
-        "Zęby",
-        "Język",
-        "Szyja",
-        "Ramię"
+        "Rogówka",
+        "Szpik kostny",
     ];
 
     private readonly string[] _specjalizacje =
@@ -306,6 +297,7 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
                         .Select(patientDoctorDonorOrgan =>
                         {
                             var (patient, doctors, donorOrgan) = patientDoctorDonorOrgan;
+                            donorOrgan.Organ.HarvestDateTime = date.AddHours(-Random.Shared.Next(25, 72));
 
                             return GenerateProcedure(hospital.Id, date, patient.Pesel, donorOrgan.Organ.Id);
                         });
@@ -415,7 +407,7 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
         {
             organs.AddRange(donorsBatch.Select(donor => new Organ
             {
-                HarvestDateTime = date.AddDays(-Random.Shared.Next(1, 14)),
+                HarvestDateTime = date.AddHours(-20),
                 ScheduledProcedureDate = date,
                 StorageType = _faker.PickRandom(_typyPrzechowywaniaNarzadow),
                 OrganTypeId = _faker.PickRandom(organTypes).Id,
@@ -455,9 +447,22 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
     private async Task GenerateOrganTypes()
     {
+        HashSet<string> doubleOrgans = [
+            "Wątroba",
+            "Płuco",
+            "Nerka",
+        ];
+
         var organTypes = _typyNarzadow
-            .Select(name => new OrganType { Name = name })
-            .ToList();
+            .Select(name =>
+            {
+                if (!doubleOrgans.Contains(name)) 
+                    return new OrganType { Name = name };
+                
+                var organSite = _faker.PickRandom("L", "P");
+                return new OrganType { Name = $"{name} {organSite}" };
+
+            }).ToList();
 
         await dbContext.BulkInsertAsync(organTypes);
     }
