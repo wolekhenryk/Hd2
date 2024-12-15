@@ -219,7 +219,7 @@ public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 
     private async Task ChangeAddressOfAPatient()
     {
-        // Randomly select a patient
+        // Select first patient from the database
         var patient = await dbContext.Patients
             .Include(p => p.Address)
             .OrderBy(_ => Guid.NewGuid())
