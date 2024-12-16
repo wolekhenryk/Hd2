@@ -27,7 +27,7 @@ public record Medication(string Name, string Chemical, string Manufacturer, deci
 
 public class Generator(HdDbContext dbContext, ILogger<Generator> logger)
 {
-    private const int NumberOfHospitals = 2;
+    private const int NumberOfHospitals = 100;
 
     private readonly Faker _faker = new();
 
